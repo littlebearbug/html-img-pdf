@@ -1,0 +1,32 @@
+{
+  "name": "html-img-pdf",
+  "version": "1.0.2",
+  "description": "HTML -> PDF 工具：TypeScript 支持的现代化导出，基于 html-to-image 与 jsPDF，支持多页与自定义页面尺寸",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup"
+  },
+  "keywords": [
+    "html2pdf",
+    "jspdf",
+    "html-to-image",
+    "pdf",
+    "typescript"
+  ],
+  "author": "mochineko",
+  "license": "MIT",
+  "dependencies": {
+    "html-to-image": "^1.11.13",
+    "jspdf": "^3.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  }
+}

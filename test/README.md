@@ -1,73 +1,43 @@
-# React + TypeScript + Vite
+# 🧪 html-img-pdf 测试环境
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+本目录包含一个基于 **Vite + React** 构建的测试演练场，旨在演示和验证 `html-img-pdf` 库的功能特性。
 
-Currently, two official plugins are available:
+核心组件 `src/App.tsx` 涵盖了多种测试场景，以确保库的稳定性与兼容性：
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **🖼 导出长图：** 测试 `auto` 尺寸设置，验证生成单张连续长图的功能。
+- **📄 多页文档：** 测试 A4 尺寸分页，验证多页 PDF 文档的导出。
+- **📊 复杂元素：** 渲染并捕获 Canvas 图表、表单控件和视频元素。
+- **🎨 CSS 布局：** 处理复杂的 CSS 样式，包括 `overflow` 溢出容器和 `float` 浮动布局。
+- **🌐 外部资源：** 验证网络图片等外部资源的加载与渲染机制。
 
-## React Compiler
+## 🚀 快速开始
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+请按照以下步骤在本地启动测试环境。
 
-## Expanding the ESLint configuration
+### 1. 进入目录
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+从项目根目录切换到 `test` 文件夹：
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd test
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 2. 安装依赖
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+使用 npm 安装必要的依赖包。
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+> **注意：** 此步骤会自动链接上一级目录中的本地 `html-img-pdf` 库，确保您测试的是最新的源代码，而非 npm 仓库中的版本。
+
+```bash
+npm install
 ```
+
+### 3. 启动开发服务器
+
+运行以下命令启动 Vite 开发服务：
+
+```bash
+npm run dev
+```
+
+服务启动后，通常运行在 **http://localhost:5173**。请在浏览器中打开该地址，访问测试面板并进行导出测试。

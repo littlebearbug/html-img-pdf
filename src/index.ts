@@ -1,120 +1,22 @@
-import { jsPDF, type jsPDFOptions } from "jspdf";
-import { toPng, toJpeg } from "html-to-image";
+import { jsPDF } from "jspdf";
+import type { Options, CaptureResult } from "./types";
+import { createEnhancedClone, destroySandbox } from "./utils/clone-utils";
+import { waitForResources } from "./utils/resource-utils";
+import { captureElement } from "./utils/capture-utils";
 
-/**
- * PDF 预设尺寸类型
- */
-export type PageSizePreset = "a4" | "letter" | "legal" | "a3" | "a5";
+export * from "./types";
 
-/**
- * 自定义尺寸接口
- */
-export interface CustomPageSize {
-  width: number;
-  height: number;
-}
-
-/**
- * 核心配置选项
- */
-export interface Options {
-  fileName?: string;
-  imageFormat?: "jpeg" | "png";
-  quality?: number;
-  backgroundColor?: string;
-  /**
-   * 页面尺寸设置
-   * - 'auto': PDF 页面大小自动适应内容大小
-   * - string: 标准尺寸 (如 'a4')，内容将按宽度缩放
-   * - object: 自定义宽高 { width, height }
-   */
-  pageSize?: "auto" | PageSizePreset | CustomPageSize;
-  /**
-   * 多页模式
-   * - true: 每个直接子元素为一页
-   * - false: 整体为一页
-   */
-  multipage?: boolean;
-  onClone?: (element: HTMLElement) => void;
-}
-
-// 浏览器 Canvas 安全限制
-const MAX_CANVAS_PIXELS = 16000;
-
-function createSandbox(
-  sourceElement: HTMLElement,
-  onClone?: (el: HTMLElement) => void
-) {
-  const sandbox = document.createElement("div");
-  sandbox.style.position = "fixed";
-  sandbox.style.top = "0";
-  sandbox.style.left = "0";
-  sandbox.style.opacity = "0";
-  sandbox.style.pointerEvents = "none";
-  sandbox.style.zIndex = "-9999";
-
-  // 保持原始宽度，避免文字重排
-  sandbox.style.width = `${sourceElement.clientWidth}px`;
-
-  const clone = sourceElement.cloneNode(true) as HTMLElement;
-
-  if (onClone) {
-    onClone(clone);
+async function runBatches<T>(
+  tasks: (() => Promise<T>)[],
+  batchSize: number
+): Promise<T[]> {
+  const results: T[] = [];
+  for (let i = 0; i < tasks.length; i += batchSize) {
+    const batch = tasks.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map((task) => task()));
+    results.push(...batchResults);
   }
-
-  sandbox.appendChild(clone);
-  document.body.appendChild(sandbox);
-
-  return { sandbox, clone };
-}
-
-function destroySandbox(sandbox: HTMLElement) {
-  if (document.body.contains(sandbox)) {
-    document.body.removeChild(sandbox);
-  }
-}
-
-async function captureElement(
-  element: HTMLElement,
-  format: "jpeg" | "png",
-  quality: number,
-  bgColor: string
-) {
-  const width = element.offsetWidth;
-  const height = element.offsetHeight;
-
-  // 忽略空元素
-  if (width === 0 || height === 0) {
-    return null;
-  }
-
-  if (width > MAX_CANVAS_PIXELS || height > MAX_CANVAS_PIXELS) {
-    throw new Error(
-      `Canvas limit exceeded: Element dimensions (${width}x${height}) exceed the safety limit of ${MAX_CANVAS_PIXELS}px.`
-    );
-  }
-
-  const opts = {
-    quality,
-    backgroundColor: bgColor,
-    // 强制重置 margin，防止截图时产生偏移
-    style: {
-      margin: "0",
-      transform: "none", // 防止父级 transform 影响
-    },
-    // 确保截图完整包含
-    width: width,
-    height: height,
-  };
-
-  let dataUrl: string;
-  if (format === "png") {
-    dataUrl = await toPng(element, opts);
-  } else {
-    dataUrl = await toJpeg(element, opts);
-  }
-
-  return { dataUrl, width, height };
+  return results;
 }
 
 export async function htmlToPdf(
@@ -124,55 +26,75 @@ export async function htmlToPdf(
   const {
     fileName = "document.pdf",
     imageFormat = "png",
-    quality = 1.0,
+    quality = 0.95,
     backgroundColor = "#ffffff",
     pageSize = "auto",
+    pageOrientation,
     multipage = false,
+    pixelRatio = window.devicePixelRatio || 2,
+    concurrency = 3,
     onClone,
   } = options;
 
-  const { sandbox, clone } = createSandbox(element, onClone);
+  const { sandbox, clone } = createEnhancedClone(element, onClone);
 
   try {
-    let targets: HTMLElement[] = [];
+    await waitForResources(clone);
+
+    let targetElements: HTMLElement[] = [];
     if (multipage) {
-      targets = Array.from(clone.children).filter(
+      targetElements = Array.from(clone.children).filter(
         (node) => node.nodeType === Node.ELEMENT_NODE
       ) as HTMLElement[];
-      if (targets.length === 0) targets = [clone];
+      if (targetElements.length === 0) targetElements = [clone];
     } else {
-      targets = [clone];
+      targetElements = [clone];
+    }
+
+    const captureTasks = targetElements.map(
+      (target) => () =>
+        captureElement(target, {
+          format: imageFormat,
+          quality,
+          backgroundColor,
+          pixelRatio,
+        })
+    );
+
+    const results = await runBatches(captureTasks, concurrency);
+    const validResults = results.filter((r): r is CaptureResult => r !== null);
+
+    if (validResults.length === 0) {
+      console.warn("[html-img-pdf] No content captured.");
+      return new jsPDF();
     }
 
     let pdf: jsPDF | null = null;
 
-    for (let i = 0; i < targets.length; i++) {
-      const target = targets[i];
-      const imgData = await captureElement(
-        target,
-        imageFormat,
-        quality,
-        backgroundColor
-      );
-
-      if (!imgData) continue; // 跳过空元素
-
-      // --- PDF 页面初始化与添加逻辑 ---
-
+    for (const imgData of validResults) {
+      // ---------------------------------------------------------
+      // 场景 1: Auto Mode (完全适应图片大小)
+      // ---------------------------------------------------------
       if (pageSize === "auto") {
-        // [Auto Mode]: 页面尺寸严格等于图片尺寸
-        const orientation = imgData.width > imgData.height ? "l" : "p";
+        // 在 Auto 模式下，方向默认由图片形状决定
+        const orientation =
+          pageOrientation === "portrait" || pageOrientation === "landscape"
+            ? pageOrientation === "portrait"
+              ? "p"
+              : "l"
+            : imgData.width > imgData.height
+            ? "l"
+            : "p";
+
         const format = [imgData.width, imgData.height];
 
         if (!pdf) {
-          // 初始化第一页
           pdf = new jsPDF({ orientation, unit: "px", format });
         } else {
-          // 添加后续页
           pdf.addPage(format, orientation);
         }
 
-        // 绘制：1:1 铺满
+        // 1:1 绘制，填满页面
         pdf.addImage(
           imgData.dataUrl,
           imageFormat.toUpperCase(),
@@ -181,41 +103,46 @@ export async function htmlToPdf(
           imgData.width,
           imgData.height
         );
-      } else {
-        // [Fixed Mode]: 使用预设尺寸 (A4 等)
-        // 1. 解析目标尺寸
-        let targetFormat: string | number[] =
+      }
+
+      // ---------------------------------------------------------
+      // 场景 2: Fixed Mode (A4, Letter 等)
+      // ---------------------------------------------------------
+      else {
+        // 1. 确定方向：默认强制纵向 (Portrait)，除非用户显式要求 auto 或 landscape
+        // 这样可以保证多页 A4 文档整齐划一，不会一页横一页竖
+        const userOrientation = pageOrientation || "portrait";
+        let orientation: "p" | "l";
+
+        if (userOrientation === "auto") {
+          orientation = imgData.width > imgData.height ? "l" : "p";
+        } else {
+          orientation = userOrientation === "landscape" ? "l" : "p";
+        }
+
+        let targetFormat =
           typeof pageSize === "string"
             ? pageSize
             : [pageSize.width, pageSize.height];
 
-        // 2. 智能判断方向：如果图片宽 > 高，则建议页面横向，否则纵向
-        // 注意：如果你希望强制纵向，可以将此处改为固定 'p'
-        const orientation = imgData.width > imgData.height ? "l" : "p";
-
+        // 2. 初始化 PDF
+        // 使用 point (pt) 是 PDF 的标准做法，确保 "a4" 无论在什么屏幕 DPI 下都是标准的物理 A4 纸大小
         if (!pdf) {
-          // 初始化第一页
-          pdf = new jsPDF({
-            orientation,
-            unit: "px",
-            format: targetFormat as any,
-          });
+          // @ts-ignore
+          pdf = new jsPDF({ orientation, unit: "pt", format: targetFormat });
         } else {
-          // 添加后续页
-          pdf.addPage(targetFormat as any, orientation);
+          // @ts-ignore
+          pdf.addPage(targetFormat, orientation);
         }
 
-        // 3. 计算绘制尺寸 (Fit Width)
         const pdfPageWidth = pdf.internal.pageSize.getWidth();
-        const pdfPageHeight = pdf.internal.pageSize.getHeight();
+        // const pdfPageHeight = pdf.internal.pageSize.getHeight();
 
-        // 计算缩放比例：让图片宽度撑满 PDF 宽度
+        // 3. 计算缩放 (Fit Width Strategy)
+        // 将像素单位的图片，缩放到点单位的 PDF 页面宽度
         const ratio = pdfPageWidth / imgData.width;
         const scaledHeight = imgData.height * ratio;
 
-        // 绘制图片
-        // 注意：这里仅按宽度缩放，如果 scaledHeight > pdfPageHeight，内容会延伸到页面外（适合长图打印）
-        // 如果需要强行缩放到一页内（Fit Page），需要再比较高度比例，但通常需求是看清内容。
         pdf.addImage(
           imgData.dataUrl,
           imageFormat.toUpperCase(),
@@ -227,14 +154,11 @@ export async function htmlToPdf(
       }
     }
 
-    if (!pdf) {
-      // 如果所有元素都是空的，创建一个空白 PDF 防止报错
-      pdf = new jsPDF();
-      console.warn("[html-img-pdf] No visible content found to render.");
-    }
-
-    pdf.save(fileName);
-    return pdf;
+    pdf!.save(fileName);
+    return pdf!;
+  } catch (err) {
+    console.error("[html-img-pdf] Export failed:", err);
+    throw err;
   } finally {
     destroySandbox(sandbox);
   }

@@ -13,11 +13,12 @@
 - **🖼️ 基于 html-to-image**: 支持更现代的 CSS 属性，渲染还原度更高。
 - **📏 智能尺寸模式**:
   - `auto`: PDF 页面大小自动等于内容大小（适合长图、报表）。
-  - `preset`: 支持 A4, A3, Letter 等标准尺寸，内容自动按宽度缩放。
-- **📚 多页支持**: 可自动将容器的每个直接子元素识别为单独的一页 PDF。
-- **🚀 并发加速**: 通过并发处理多页任务，提升导出速度。
-- **🔒 沙箱渲染**: 渲染过程在隐藏的沙箱中进行，不影响当前页面 UI，且自动处理滚动条偏移问题。
-- **🎨 高度可配置**: 支持背景色、图片质量、格式（PNG/JPEG）、页面方向、自定义像素比及回调。
+  - 标准纸张: 支持 A4, A3, Letter 等常见尺寸，内容按宽度自动缩放。
+- **📚 多页支持**: 可自动将容器的每个直接子元素识别为单独的一页 PDF（`multipage`）。
+- **🚀 并发加速**: 通过并发处理多页任务，提升导出速度（`concurrency`）。
+- **🔒 沙箱渲染与调试**: 渲染在隐藏的沙箱中进行，不影响页面 UI；支持 `debug` 模式，生成后保留沙箱便于调试。
+- **🧭 自动滚动/展开**: 支持 `autoScroll`，可将带滚动的容器展开以完整截取其全部内容。
+- **🎨 高度可配置**: 支持背景色、图片质量、格式（PNG/JPEG）、页面方向、自定义像素比及 `onClone` 回调。
 - **TS**: 完整的 TypeScript 类型定义。
 
 ## 📦 安装
@@ -49,7 +50,7 @@ await htmlToPdf(element, {
 
 ### 2. 导出为 A4 格式 (标准文档)
 
-将内容强制放入 A4 页面中。内容会**保持宽高比**，并**自动缩放**以适应 A4 纸的宽度。
+将内容放入 A4 页面中，内容会等比缩放以适应页面宽度。
 
 ```typescript
 await htmlToPdf(element, {
@@ -76,8 +77,19 @@ const container = document.getElementById("slides-container");
 
 await htmlToPdf(container, {
   fileName: "presentation.pdf",
-  multipage: true, // 开启多页模式
-  pageSize: "auto", // 每页尺寸随内容自动调整 (也可设为 'a4')
+  multipage: true,
+  pageSize: "auto",
+});
+```
+
+### 4. 调试或在页面上查看沙箱
+
+开启 `debug: true`，库将在页面上保留并显示沙箱（左上角）以便你审查克隆后的 DOM；同时默认不会自动保存文件，方便人工检查。
+
+```typescript
+await htmlToPdf(document.body, {
+  debug: true,
+  fileName: "debug.pdf",
 });
 ```
 
@@ -94,16 +106,18 @@ await htmlToPdf(container, {
 
 | 属性名            | 类型                                                       | 默认值                         | 说明                                                                                                               |
 | :---------------- | :--------------------------------------------------------- | :----------------------------- | :----------------------------------------------------------------------------------------------------------------- |
-| `fileName`        | `string`                                                   | `"document.pdf"`               | 导出的文件名。                                                                                                     |
-| `pageSize`        | `'auto'` \| `'a4'` \| `'letter'`... \| `{ width, height }` | `'auto'`                       | **'auto'**: 页面尺寸等于截图尺寸。<br>**'a4'等**: 使用标准纸张尺寸。<br>**{width, height}**: 自定义 PDF 页面宽高。 |
-| `pageOrientation` | `'portrait'` \| `'landscape'` \| `'auto'`                  | `'portrait'`                   | 页面方向。在 `pageSize` 为 'auto' 时，会根据内容自动判断。                                                         |
-| `multipage`       | `boolean`                                                  | `false`                        | 是否开启多页模式。开启后，`element` 的每个直接子元素将生成一页 PDF。                                               |
+| `fileName`        | `string`                                                   | `"document.pdf"`             | 导出的文件名。                                                                                                     |
+| `pageSize`        | `'auto'` \| `'a4'` \| `'letter'`... \| `{ width, height }` | `'auto'`                       | **'auto'**: 页面尺寸等于截图尺寸。<br>**标准纸张**: 使用标准纸张尺寸（如 `a4`）。<br>**{width, height}**: 自定义 PDF 页面宽高（pt/px 视上下文而定）。 |
+| `pageOrientation` | `'portrait'` \| `'landscape'` \| `'auto'`                  | `'portrait'`                   | 页面方向；设置为 `auto` 或在 `pageSize: 'auto'` 时库会根据内容宽高比自动判断。                                                         |
+| `multipage`       | `boolean`                                                  | `false`                        | 是否开启多页模式。开启后，`element` 的每个直接子元素将生成一页 PDF（若没有直接子元素，则整个克隆作为一页）。                                               |
 | `imageFormat`     | `'png'` \| `'jpeg'`                                        | `'png'`                        | 截图生成的图片格式。JPEG 体积更小，PNG 支持透明。                                                                  |
 | `quality`         | `number`                                                   | `0.95`                         | 图片质量 (0 - 1)，仅对 JPEG 有效。                                                                                 |
-| `pixelRatio`      | `number`                                                   | `window.devicePixelRatio` \| 2 | 渲染像素比。调高可提升清晰度，但会增加文件体积。                                                                   |
+| `pixelRatio`      | `number`                                                   | `window.devicePixelRatio`      | 渲染像素比。调高该数值可提高清晰度，但会增加内存与文件体积。默认使用 `window.devicePixelRatio`。                                                                   |
 | `concurrency`     | `number`                                                   | `3`                            | 并发处理页数。数值越大速度越快，但内存占用越高。                                                                   |
-| `backgroundColor` | `string`                                                   | `"#ffffff"`                    | PDF 页面的背景颜色。                                                                                               |
-| `onClone`         | `(el: HTMLElement) => void`                                | `undefined`                    | 在截图前修改克隆 DOM 的回调。可用于隐藏按钮、修改样式等，不影响页面上的真实元素。                                  |
+| `backgroundColor` | `string`                                                   | `"#ffffff"`                  | PDF 页面的背景颜色（当导出 PNG 并且需透明时可设为 `transparent`）。                                                                                               |
+| `debug`           | `boolean`                                                  | `false`                        | 是否开启调试模式。`true` 时会在页面上显示沙箱并且默认不自动销毁与不自动保存文件，便于调试。                                                          |
+| `autoScroll`      | `boolean`                                                  | `true`                         | 是否自动展开带滚动的容器以截取全部内容。`true` 会尝试将 `overflow` 展开，`false` 则只截取可视区域。                                                                   |
+| `onClone`         | `(clone: HTMLElement, sandbox?: HTMLElement) => void`      | `undefined`                    | 在截图前修改克隆 DOM 的回调。可用于隐藏按钮、调整样式等。回调会同时传入包裹克隆内容的 `sandbox` 容器，便于定位与样式调整。                                  |
 
 ## 💡 常见问题与技巧
 
@@ -121,21 +135,26 @@ await htmlToPdf(container, {
 
 ### 3. `onClone` 的妙用
 
-有时候我们需要导出的样式和屏幕显示的样式不同（比如导出时隐藏“打印”按钮）。
+在克隆完成后会回调 `onClone(clone, sandbox)`，你可以在克隆的 DOM 中做任何不会影响真实页面的改动，例如隐藏按钮、替换图片地址、强制字体颜色等：
 
 ```typescript
 htmlToPdf(document.body, {
-  onClone: (clonedDoc) => {
-    // 在克隆的 DOM 中查找并隐藏按钮
-    const btn = clonedDoc.querySelector(".print-btn");
+  onClone: (clone, sandbox) => {
+    const btn = clone.querySelector(".print-btn");
     if (btn) btn.style.display = "none";
 
-    // 强制修改某个文字颜色
-    const title = clonedDoc.querySelector("h1");
+    const title = clone.querySelector("h1");
     if (title) title.style.color = "black";
+
+    // 可以通过 sandbox 精确定位容器并调整样式
+    if (sandbox) sandbox.style.padding = "8px";
   },
 });
 ```
+
+### 4. Debug 与沙箱
+
+开启 `debug: true` 会在页面左上角显示沙箱，你可以在浏览器开发者工具中检查克隆后的 DOM。如果你想同时保存 PDF 以便比较，调试时也可以手动调用返回的 `jsPDF.save()`。
 
 ## 📄 License
 

@@ -36,6 +36,7 @@ function App() {
         quality: 0.9,
         concurrency: 3, // 测试并发
         pixelRatio: 2, // 测试高清
+        debug: true,
         onClone: (doc) => {
           console.log("Clone created for debugging:", doc);
         },

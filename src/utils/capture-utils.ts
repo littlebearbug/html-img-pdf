@@ -2,8 +2,8 @@ import { toPng, toJpeg } from "html-to-image";
 import type { CaptureResult } from "../types";
 
 // 安全限制：防止生成导致浏览器崩溃的超大 Canvas
-// 15000px 是 iOS Safari 的硬限制附近，保留安全余量
-const MAX_DIMENSION = 15000;
+// 浏览器 Canvas 安全限制 (iOS Safari 限制约为 16384px)
+const MAX_CANVAS_PIXELS = 16000;
 
 interface CaptureOptions {
   format: "jpeg" | "png";
@@ -22,7 +22,7 @@ export async function captureElement(
 
   if (width === 0 || height === 0) return null;
 
-  if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+  if (width > MAX_CANVAS_PIXELS || height > MAX_CANVAS_PIXELS) {
     console.error(
       `[html-img-pdf] Element too large (${width}x${height}). Skipped to prevent crash.`
     );

@@ -1,3 +1,5 @@
+import type { Options } from "../types";
+
 /**
  * 深度同步 Form 状态并解决 Radio 冲突
  */
@@ -110,7 +112,7 @@ export function convertVideoToImage(source: HTMLElement, clone: HTMLElement) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const img = document.createElement("img");
         img.src = canvas.toDataURL("image/png");
-        img.style.cssText = "width:100%; height:100%; object-fit:contain;";
+        img.style.cssText = "width:100%; object-fit:contain;";
 
         if (cloneVideo.parentNode) {
           cloneVideo.parentNode.replaceChild(img, cloneVideo);
@@ -144,27 +146,83 @@ export function expandScrollableElements(clone: HTMLElement) {
 
 export function createEnhancedClone(
   source: HTMLElement,
-  onClone?: (el: HTMLElement) => void
+  options: {
+    onClone?: Options["onClone"];
+    autoScroll?: boolean;
+    debug?: boolean;
+  }
 ): { sandbox: HTMLElement; clone: HTMLElement } {
-  const sandbox = document.createElement("div");
+  const { onClone, autoScroll = true, debug = false } = options;
 
-  // 1. 样式隔离与上下文继承
-  // 复制 body 的关键样式，防止克隆体失去字体等上下文
+  const sandbox = document.createElement("div");
   const bodyStyle = window.getComputedStyle(document.body);
-  sandbox.style.cssText = `
-    position: absolute; 
-    top: -10000px; 
-    left: -10000px;
-    opacity: 0;
-    pointer-events: none;
+
+  // 基础样式
+  let sandboxCss = `
+    position: fixed; 
     width: ${source.clientWidth}px; 
     font-family: ${bodyStyle.fontFamily};
     font-size: ${bodyStyle.fontSize};
     color: ${bodyStyle.color};
     line-height: ${bodyStyle.lineHeight};
     text-align: ${bodyStyle.textAlign};
-    z-index: -999999;
   `;
+
+  if (debug) {
+    // DEBUG 模式：显示在页面左上角，加红框
+    console.log("[html-img-pdf] Debug mode active: Sandbox is visible.");
+    sandboxCss += `
+        top: 20px;
+        left: 20px;
+        z-index: 99999;
+        background: rgba(255, 255, 255, 0.95);
+        border: 5px solid red;
+        box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        pointer-events: auto; /* 允许审查元素 */
+        overflow: auto;
+        max-height: 90vh; /* 防止太长超出屏幕 */
+      `;
+  } else {
+    // 正常模式：隐藏到屏幕外
+    sandboxCss += `
+        top: -10000px; 
+        left: -10000px; 
+        z-index: -9999;
+        opacity: 0;
+        pointer-events: none; /* 防止影响页面交互 */
+      `;
+  }
+
+  sandbox.style.cssText = sandboxCss;
+
+  // 加上一个 ID 方便开发者在 Elements 面板里找
+  sandbox.id = "html-img-pdf-sandbox";
+
+  if (debug) {
+    const closeBtn = document.createElement("button");
+    closeBtn.textContent = "✕";
+    closeBtn.style.cssText = `
+      position: absolute;
+      top: 0;
+      right: 0;
+      z-index: 100000;
+      width: 40px;
+      height: 40px;
+      padding: 10px;
+      background: transparent;
+      color: black;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+      text-align: center;
+      outline: none;
+    `;
+
+    // 点击销毁
+    closeBtn.onclick = () => destroySandbox(sandbox);
+
+    sandbox.appendChild(closeBtn);
+  }
 
   const clone = source.cloneNode(true) as HTMLElement;
 
@@ -175,8 +233,16 @@ export function createEnhancedClone(
     syncFormStates(source, clone);
     copyCanvasContent(source, clone);
     convertVideoToImage(source, clone);
-    expandScrollableElements(clone);
-    if (onClone) onClone(clone);
+
+    // 只有在开启 autoScroll 时才展开
+    if (autoScroll) {
+      expandScrollableElements(clone);
+    }
+
+    // 增强 onClone，传入 sandbox
+    if (onClone) {
+      onClone(clone, sandbox);
+    }
   } catch (e) {
     console.error("[html-img-pdf] Clone enhancement error:", e);
   }

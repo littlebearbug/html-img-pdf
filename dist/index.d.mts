@@ -41,7 +41,24 @@ interface Options {
      * 数值越大速度越快，但内存占用越高，过高会导致浏览器崩溃
      */
     concurrency?: number;
-    onClone?: (element: HTMLElement) => void;
+    /**
+     * 是否开启调试模式
+     * - true: 生成结束后不销毁沙箱，并将其显示在页面左上角供审查 DOM
+     * - false: (默认) 生成结束后自动销毁沙箱
+     */
+    debug?: boolean;
+    /**
+     * 是否自动展开滚动区域
+     * - true: (默认) 将 overflow: auto/scroll 的元素强制展开，height: auto
+     * - false: 保留滚动条，截取可视区域
+     */
+    autoScroll?: boolean;
+    /**
+     * 克隆完成后的回调
+     * @param clone - 克隆后的内容节点
+     * @param sandbox - 包裹克隆节点的沙箱容器 (div)
+     */
+    onClone?: (clone: HTMLElement, sandbox?: HTMLElement) => void;
 }
 interface CaptureResult {
     dataUrl: string;

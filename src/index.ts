@@ -33,10 +33,17 @@ export async function htmlToPdf(
     multipage = false,
     pixelRatio = window.devicePixelRatio || 2,
     concurrency = 3,
+    debug = false, // 新增
+    autoScroll = true, // 新增
     onClone,
   } = options;
 
-  const { sandbox, clone } = createEnhancedClone(element, onClone);
+  // 传入新的配置项到 Clone 工具
+  const { sandbox, clone } = createEnhancedClone(element, {
+    onClone,
+    autoScroll,
+    debug,
+  });
 
   try {
     await waitForResources(clone);
@@ -72,11 +79,7 @@ export async function htmlToPdf(
     let pdf: jsPDF | null = null;
 
     for (const imgData of validResults) {
-      // ---------------------------------------------------------
-      // 场景 1: Auto Mode (完全适应图片大小)
-      // ---------------------------------------------------------
       if (pageSize === "auto") {
-        // 在 Auto 模式下，方向默认由图片形状决定
         const orientation =
           pageOrientation === "portrait" || pageOrientation === "landscape"
             ? pageOrientation === "portrait"
@@ -87,14 +90,11 @@ export async function htmlToPdf(
             : "p";
 
         const format = [imgData.width, imgData.height];
-
         if (!pdf) {
           pdf = new jsPDF({ orientation, unit: "px", format });
         } else {
           pdf.addPage(format, orientation);
         }
-
-        // 1:1 绘制，填满页面
         pdf.addImage(
           imgData.dataUrl,
           imageFormat.toUpperCase(),
@@ -103,17 +103,9 @@ export async function htmlToPdf(
           imgData.width,
           imgData.height
         );
-      }
-
-      // ---------------------------------------------------------
-      // 场景 2: Fixed Mode (A4, Letter 等)
-      // ---------------------------------------------------------
-      else {
-        // 1. 确定方向：默认强制纵向 (Portrait)，除非用户显式要求 auto 或 landscape
-        // 这样可以保证多页 A4 文档整齐划一，不会一页横一页竖
+      } else {
         const userOrientation = pageOrientation || "portrait";
         let orientation: "p" | "l";
-
         if (userOrientation === "auto") {
           orientation = imgData.width > imgData.height ? "l" : "p";
         } else {
@@ -125,8 +117,6 @@ export async function htmlToPdf(
             ? pageSize
             : [pageSize.width, pageSize.height];
 
-        // 2. 初始化 PDF
-        // 使用 point (pt) 是 PDF 的标准做法，确保 "a4" 无论在什么屏幕 DPI 下都是标准的物理 A4 纸大小
         if (!pdf) {
           // @ts-ignore
           pdf = new jsPDF({ orientation, unit: "pt", format: targetFormat });
@@ -136,10 +126,6 @@ export async function htmlToPdf(
         }
 
         const pdfPageWidth = pdf.internal.pageSize.getWidth();
-        // const pdfPageHeight = pdf.internal.pageSize.getHeight();
-
-        // 3. 计算缩放 (Fit Width Strategy)
-        // 将像素单位的图片，缩放到点单位的 PDF 页面宽度
         const ratio = pdfPageWidth / imgData.width;
         const scaledHeight = imgData.height * ratio;
 
@@ -154,12 +140,28 @@ export async function htmlToPdf(
       }
     }
 
-    pdf!.save(fileName);
-    return pdf!;
+    if (!pdf) {
+      throw new Error("PDF generation failed: No pages rendered.");
+    }
+
+    if (!debug) {
+      pdf.save(fileName);
+    } else {
+      console.log(
+        "[html-img-pdf] Debug mode: PDF generated but not saved. Check the sandbox on screen."
+      );
+      // 在 debug 模式下，也可以选择 save，看你需求，通常保留 save 方便对比
+      // pdf.save("debug-" + fileName);
+    }
+
+    return pdf;
   } catch (err) {
     console.error("[html-img-pdf] Export failed:", err);
     throw err;
   } finally {
-    destroySandbox(sandbox);
+    // Debug 模式下不销毁沙箱
+    if (!debug) {
+      destroySandbox(sandbox);
+    }
   }
 }

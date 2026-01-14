@@ -1,13 +1,17 @@
 {
   "name": "html-img-pdf",
-  "version": "1.1.1",
-  "description": "HTML -> PDF 工具：TypeScript 支持的现代化导出，基于 html-to-image 与 jsPDF，支持多页与自定义页面尺寸",
+  "version": "1.2.0",
+  "description": "高性能 HTML -> PDF 工具：按需加载依赖以减小体积，支持进度回调、资源超时控制与元素过滤，基于 html-to-image 与 jsPDF",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "files": [
     "dist"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/littlebearbug/html-img-pdf.git"
+  },
   "scripts": {
     "build": "tsup"
   },

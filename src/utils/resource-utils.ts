@@ -1,4 +1,7 @@
-export async function waitForResources(element: HTMLElement): Promise<void> {
+export async function waitForResources(
+  element: HTMLElement,
+  timeout = 2000
+): Promise<void> {
   // 1. 字体
   try {
     await document.fonts.ready;
@@ -21,8 +24,8 @@ export async function waitForResources(element: HTMLElement): Promise<void> {
       // 成功或失败都 resolve，防止死锁
       img.onload = () => resolve();
       img.onerror = () => resolve();
-      // 超时保护：如果图片 2秒内没加载完，强行继续
-      setTimeout(() => resolve(), 2000);
+      // 超时保护
+      setTimeout(() => resolve(), timeout);
     });
   });
 

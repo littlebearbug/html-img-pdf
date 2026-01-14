@@ -1,5 +1,4 @@
-import { toPng, toJpeg } from "html-to-image";
-import type { CaptureResult } from "../types";
+import type { CaptureResult, Options } from "../types";
 
 // 安全限制：防止生成导致浏览器崩溃的超大 Canvas
 // 浏览器 Canvas 安全限制 (iOS Safari 限制约为 16384px)
@@ -10,13 +9,15 @@ interface CaptureOptions {
   quality: number;
   backgroundColor: string;
   pixelRatio: number;
+  ignoreElements?: Options["ignoreElements"];
 }
 
 export async function captureElement(
   element: HTMLElement,
   options: CaptureOptions
 ): Promise<CaptureResult | null> {
-  const { format, quality, backgroundColor, pixelRatio } = options;
+  const { format, quality, backgroundColor, pixelRatio, ignoreElements } =
+    options;
   const width = element.offsetWidth;
   const height = element.offsetHeight;
 
@@ -28,6 +29,9 @@ export async function captureElement(
     );
     return null;
   }
+
+  // 动态导入 html-to-image
+  const { toPng, toJpeg } = await import("html-to-image");
 
   const libOptions = {
     quality,
@@ -41,6 +45,7 @@ export async function captureElement(
       margin: "0",
       transform: "none",
     },
+    filter: ignoreElements,
   };
 
   try {

@@ -8,17 +8,10 @@
 
 它结合了 [html-to-image](https://github.com/bubkoo/html-to-image) 的渲染能力与 [jsPDF](https://github.com/parallax/jsPDF) 的 PDF 生成能力，解决了传统 `html2canvas` 截图模糊、样式丢失等问题。支持**所见即所得**的自动尺寸导出，也支持标准的 **A4/Letter 分页**导出。
 
-## ✨ 特性
-
-- **🖼️ 基于 html-to-image**: 支持更现代的 CSS 属性，渲染还原度更高。
-- **📏 智能尺寸模式**:
-  - `auto`: PDF 页面大小自动等于内容大小（适合长图、报表）。
-  - 标准纸张: 支持 A4, A3, Letter 等常见尺寸，内容按宽度自动缩放。
-- **📚 多页支持**: 可自动将容器的每个直接子元素识别为单独的一页 PDF（`multipage`）。
-- **🚀 并发加速**: 通过并发处理多页任务，提升导出速度（`concurrency`）。
-- **🔒 沙箱渲染与调试**: 渲染在隐藏的沙箱中进行，不影响页面 UI；支持 `debug` 模式，生成后保留沙箱便于调试。
-- **🧭 自动滚动/展开**: 支持 `autoScroll`，可将带滚动的容器展开以完整截取其全部内容。
-- **🎨 高度可配置**: 支持背景色、图片质量、格式（PNG/JPEG）、页面方向、自定义像素比及 `onClone` 回调。
+- **📦 按需加载 (Turbo Loading)**: `jspdf` 与 `html-to-image` 等重型依赖采用动态导入，大幅减小初始加载体积。
+- **📊 进度监听**: 支持 `onProgress` 回调，实时获取导出进度。
+- **⏱️ 资源加载控制**: 支持 `resourceTimeout`，防止因某张图片加载失败导致任务永久挂起。
+- **🧹 元素过滤**: 支持 `ignoreElements` 逻辑，可在克隆阶段排除特定元素。
 - **TS**: 完整的 TypeScript 类型定义。
 
 ## 📦 安装
@@ -104,20 +97,23 @@ await htmlToPdf(document.body, {
 
 #### Options 配置项
 
-| 属性名            | 类型                                                       | 默认值                         | 说明                                                                                                               |
-| :---------------- | :--------------------------------------------------------- | :----------------------------- | :----------------------------------------------------------------------------------------------------------------- |
-| `fileName`        | `string`                                                   | `"document.pdf"`             | 导出的文件名。                                                                                                     |
-| `pageSize`        | `'auto'` \| `'a4'` \| `'letter'`... \| `{ width, height }` | `'auto'`                       | **'auto'**: 页面尺寸等于截图尺寸。<br>**标准纸张**: 使用标准纸张尺寸（如 `a4`）。<br>**{width, height}**: 自定义 PDF 页面宽高（pt/px 视上下文而定）。 |
-| `pageOrientation` | `'portrait'` \| `'landscape'` \| `'auto'`                  | `'portrait'`                   | 页面方向；设置为 `auto` 或在 `pageSize: 'auto'` 时库会根据内容宽高比自动判断。                                                         |
-| `multipage`       | `boolean`                                                  | `false`                        | 是否开启多页模式。开启后，`element` 的每个直接子元素将生成一页 PDF（若没有直接子元素，则整个克隆作为一页）。                                               |
-| `imageFormat`     | `'png'` \| `'jpeg'`                                        | `'png'`                        | 截图生成的图片格式。JPEG 体积更小，PNG 支持透明。                                                                  |
-| `quality`         | `number`                                                   | `0.95`                         | 图片质量 (0 - 1)，仅对 JPEG 有效。                                                                                 |
-| `pixelRatio`      | `number`                                                   | `window.devicePixelRatio`      | 渲染像素比。调高该数值可提高清晰度，但会增加内存与文件体积。默认使用 `window.devicePixelRatio`。                                                                   |
-| `concurrency`     | `number`                                                   | `3`                            | 并发处理页数。数值越大速度越快，但内存占用越高。                                                                   |
-| `backgroundColor` | `string`                                                   | `"#ffffff"`                  | PDF 页面的背景颜色（当导出 PNG 并且需透明时可设为 `transparent`）。                                                                                               |
-| `debug`           | `boolean`                                                  | `false`                        | 是否开启调试模式。`true` 时会在页面上显示沙箱并且默认不自动销毁与不自动保存文件，便于调试。                                                          |
-| `autoScroll`      | `boolean`                                                  | `true`                         | 是否自动展开带滚动的容器以截取全部内容。`true` 会尝试将 `overflow` 展开，`false` 则只截取可视区域。                                                                   |
-| `onClone`         | `(clone: HTMLElement, sandbox?: HTMLElement) => void`      | `undefined`                    | 在截图前修改克隆 DOM 的回调。可用于隐藏按钮、调整样式等。回调会同时传入包裹克隆内容的 `sandbox` 容器，便于定位与样式调整。                                  |
+| 属性名            | 类型                                                       | 默认值                    | 说明                                                                                                                                                  |
+| :---------------- | :--------------------------------------------------------- | :------------------------ | :---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fileName`        | `string`                                                   | `"document.pdf"`          | 导出的文件名。                                                                                                                                        |
+| `pageSize`        | `'auto'` \| `'a4'` \| `'letter'`... \| `{ width, height }` | `'auto'`                  | **'auto'**: 页面尺寸等于截图尺寸。<br>**标准纸张**: 使用标准纸张尺寸（如 `a4`）。<br>**{width, height}**: 自定义 PDF 页面宽高（pt/px 视上下文而定）。 |
+| `pageOrientation` | `'portrait'` \| `'landscape'` \| `'auto'`                  | `'portrait'`              | 页面方向；设置为 `auto` 或在 `pageSize: 'auto'` 时库会根据内容宽高比自动判断。                                                                        |
+| `multipage`       | `boolean`                                                  | `false`                   | 是否开启多页模式。开启后，`element` 的每个直接子元素将生成一页 PDF（若没有直接子元素，则整个克隆作为一页）。                                          |
+| `imageFormat`     | `'png'` \| `'jpeg'`                                        | `'png'`                   | 截图生成的图片格式。JPEG 体积更小，PNG 支持透明。                                                                                                     |
+| `quality`         | `number`                                                   | `0.95`                    | 图片质量 (0 - 1)，仅对 JPEG 有效。                                                                                                                    |
+| `pixelRatio`      | `number`                                                   | `window.devicePixelRatio` | 渲染像素比。调高该数值可提高清晰度，但会增加内存与文件体积。默认使用 `window.devicePixelRatio`。                                                      |
+| `concurrency`     | `number`                                                   | `3`                       | 并发处理页数。数值越大速度越快，但内存占用越高。                                                                                                      |
+| `backgroundColor` | `string`                                                   | `"#ffffff"`               | PDF 页面的背景颜色（当导出 PNG 并且需透明时可设为 `transparent`）。                                                                                   |
+| `debug`           | `boolean`                                                  | `false`                   | 是否开启调试模式。`true` 时会在页面上显示沙箱并且默认不自动销毁与不自动保存文件，便于调试。                                                           |
+| `autoScroll`      | `boolean`                                                  | `true`                    | 是否自动展开带滚动的容器以截取全部内容。`true` 会尝试将 `overflow` 展开，`false` 则只截取可视区域。                                                   |
+| `onClone`         | `(clone: HTMLElement, sandbox?: HTMLElement) => void`      | `undefined`               | 在截图前修改克隆 DOM 的回调。可用于隐藏按钮、调整样式等。                                                                                             |
+| `onProgress`      | `(progress, current, total) => void`                       | `undefined`               | **(New)** 进度回调。`progress`: 0-100 的整数；`current`: 当前处理的页数；`total`: 总页数。                                                            |
+| `resourceTimeout` | `number`                                                   | `2000`                    | **(New)** 图片、字体等资源的加载超时时间（ms）。                                                                                                      |
+| `ignoreElements`  | `(element: Element) => boolean`                            | `undefined`               | **(New)** 元素过滤器。返回 `true` 的元素将不会被渲染到 PDF 中。                                                                                       |
 
 ## 💡 常见问题与技巧
 
@@ -142,13 +138,13 @@ htmlToPdf(document.body, {
   onClone: (clone, sandbox) => {
     const btn = clone.querySelector(".print-btn");
     if (btn) btn.style.display = "none";
-
-    const title = clone.querySelector("h1");
-    if (title) title.style.color = "black";
-
-    // 可以通过 sandbox 精确定位容器并调整样式
-    if (sandbox) sandbox.style.padding = "8px";
   },
+  // 过滤掉所有带 .skip-in-pdf 类的元素
+  ignoreElements: (el) => el.classList.contains("skip-in-pdf"),
+  // 超时控制
+  resourceTimeout: 5000,
+  // 进度监听
+  onProgress: (p) => console.log(`已成功生成 ${p}%`),
 });
 ```
 

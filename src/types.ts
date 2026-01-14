@@ -68,6 +68,24 @@ export interface Options {
    * @param sandbox - 包裹克隆节点的沙箱容器 (div)
    */
   onClone?: (clone: HTMLElement, sandbox?: HTMLElement) => void;
+
+  /**
+   * 进度回调
+   * @param progress - 当前进度 (0 - 100)
+   * @param current - 当前处理的页数/元素数
+   * @param total - 总页数/元素数
+   */
+  onProgress?: (progress: number, current: number, total: number) => void;
+
+  /**
+   * 资源加载超时时间 (毫秒)，默认 2000
+   */
+  resourceTimeout?: number;
+
+  /**
+   * 自定义元素过滤，返回 true 则忽略该元素 (不会出现在 PDF 中)
+   */
+  ignoreElements?: (element: Element) => boolean;
 }
 
 export interface CaptureResult {

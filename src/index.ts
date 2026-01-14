@@ -1,4 +1,4 @@
-import { jsPDF } from "jspdf";
+import type { jsPDF } from "jspdf";
 import type { Options, CaptureResult } from "./types";
 import { createEnhancedClone, destroySandbox } from "./utils/clone-utils";
 import { waitForResources } from "./utils/resource-utils";
@@ -8,13 +8,22 @@ export * from "./types";
 
 async function runBatches<T>(
   tasks: (() => Promise<T>)[],
-  batchSize: number
+  batchSize: number,
+  onProgress?: (val: number, current: number, total: number) => void
 ): Promise<T[]> {
   const results: T[] = [];
-  for (let i = 0; i < tasks.length; i += batchSize) {
+  const total = tasks.length;
+  let completed = 0;
+
+  for (let i = 0; i < total; i += batchSize) {
     const batch = tasks.slice(i, i + batchSize);
     const batchResults = await Promise.all(batch.map((task) => task()));
     results.push(...batchResults);
+
+    completed += batch.length;
+    if (onProgress) {
+      onProgress(Math.round((completed / total) * 100), completed, total);
+    }
   }
   return results;
 }
@@ -36,6 +45,9 @@ export async function htmlToPdf(
     debug = false, // 新增
     autoScroll = true, // 新增
     onClone,
+    onProgress,
+    resourceTimeout = 2000,
+    ignoreElements,
   } = options;
 
   // 传入新的配置项到 Clone 工具
@@ -46,7 +58,7 @@ export async function htmlToPdf(
   });
 
   try {
-    await waitForResources(clone);
+    await waitForResources(clone, resourceTimeout);
 
     let targetElements: HTMLElement[] = [];
     if (multipage) {
@@ -65,11 +77,15 @@ export async function htmlToPdf(
           quality,
           backgroundColor,
           pixelRatio,
+          ignoreElements,
         })
     );
 
-    const results = await runBatches(captureTasks, concurrency);
+    const results = await runBatches(captureTasks, concurrency, onProgress);
     const validResults = results.filter((r): r is CaptureResult => r !== null);
+
+    // 动态导入 jsPDF
+    const { jsPDF } = await import("jspdf");
 
     if (validResults.length === 0) {
       console.warn("[html-img-pdf] No content captured.");
